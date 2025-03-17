@@ -5,7 +5,7 @@ from qdrant_client import QdrantClient
 import os
 
 # API configuration
-API_KEY = "Your API Key"
+API_KEY = "sk-d7f14c1b081b46a394487a2655e4755d"
 BASE_URL = "https://api.deepseek.com"
 
 # Set environment variables
@@ -33,7 +33,7 @@ config = {
     "vector_store": {
         "provider": "qdrant",
         "config": {
-            "collection_name": "test",
+            "collection_name": "collection_name",
             "host": "localhost",
             "port": 6333,
             "embedding_model_dims": 1024,
