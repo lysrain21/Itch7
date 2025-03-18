@@ -5,7 +5,7 @@ import tempfile
 import traceback  
 from .memory_store import export_qdrant_snapshot, import_qdrant_snapshot
 from .chat import chat_with_memories
-from .config import memory, openai_client
+from .config import get_user_memory, openai_client
 import logging
 from flask import Response, stream_with_context
 import json
@@ -19,14 +19,17 @@ logger = logging.getLogger(__name__)
 
 # Initializing the Flask application
 app = Flask(__name__)
-CORS(app)  
+CORS(app)   
 
 @app.route('/api/export-memory', methods=['POST'])
 def export_memory():
     """Export memory snapshot and return file download"""
     try:
-        # Use the function in memory_store to create a snapshot directly, which will be saved to the your_memory directory
-        snapshot_path = export_qdrant_snapshot()
+        data = request.json or {}
+        user_id = data.get('user_id', 'default_user')
+        
+        # 使用用户特定集合导出快照
+        snapshot_path = export_qdrant_snapshot(user_id=user_id)
         
         if not snapshot_path or not os.path.exists(snapshot_path):
             return jsonify({"error": "Snapshot export failed"}), 500
@@ -48,7 +51,10 @@ def import_memory():
     """Importing a memory snapshot from an uploaded file"""
     temp_file_path = None
     try:
-        # Check if there is a file uploaded
+        # 获取用户ID
+        user_id = request.form.get('user_id', 'default_user')
+        
+        # 检查是否有上传的文件
         if 'snapshot' not in request.files:
             print("Uploaded file not found")
             return jsonify({"error": "Uploaded file not found"}), 400
@@ -71,7 +77,7 @@ def import_memory():
         print(f"Saved temporary file: {temp_file_path}, size: {file_size} bytes")
         
         # Importing a Snapshot
-        success = import_qdrant_snapshot(temp_file_path)
+        success = import_qdrant_snapshot(temp_file_path, user_id=user_id)
         
         if success:
             print("Import Success")
@@ -105,16 +111,19 @@ def chat():
         message = data['message']
         user_id = data.get('user_id', 'default_user')
         
-        print(f"Received chat message: {message}")
+        print(f"Received chat message from user {user_id}: {message}")
         
         # Use a generator function for streaming response
         def generate():
             try:
-                # Get relevant memories
-                relevant_memories = memory.search(query=message, user_id=user_id, limit=3)
+                # 为特定用户获取内存实例
+                user_memory = get_user_memory(user_id)
+                
+                # 获取相关内存
+                relevant_memories = user_memory.search(query=message, user_id=user_id, limit=3)
                 memories_str = "\n".join(f"- {entry['memory']}" for entry in relevant_memories["results"])
                 
-                # Generate Assistant response
+                # 生成助手响应
                 system_prompt = f"You are a helpful AI. Answer the question based on query and memories.\nUser Memories:\n{memories_str}"
                 messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": message}]
                 
@@ -138,7 +147,7 @@ def chat():
                 
                 # Create new conversation memory
                 messages.append({"role": "assistant", "content": assistant_response})
-                memory.add(messages, user_id=user_id)
+                user_memory.add(messages, user_id=user_id)
                 
                 # Send end marker
                 yield f"data: {json.dumps({'done': True})}\n\n"

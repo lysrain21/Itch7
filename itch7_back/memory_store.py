@@ -2,24 +2,25 @@ import os
 import datetime
 import requests
 import traceback
-from .config import config, qdrant_client
+from .config import config, qdrant_client, get_collection_name
 
-def export_qdrant_snapshot(collection_name=None, snapshot_path=None):
+def export_qdrant_snapshot(user_id="default_user", collection_name=None, snapshot_path=None):
     """
     Export Qdrant collection to a snapshot file
     
     Args:
-        collection_name: Name of the collection to export, default is the collection name in config
+        user_id: User ID to specify which collection to export
+        collection_name: Name of the collection to export, default is based on user_id
         snapshot_path: Path to save the snapshot file, default is a timestamp-named file in the your_memory directory
         
     Returns:
         str: Path where the snapshot file is saved
     """
     if collection_name is None:
-        collection_name = config["vector_store"]["config"]["collection_name"]
+        collection_name = get_collection_name(user_id)
     
-    # Create directory to save the snapshot
-    memory_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "your_memory")
+    # 创建保存快照的目录
+    memory_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "your_memory", user_id)
     if not os.path.exists(memory_dir):
         print(f"Creating directory: {memory_dir}")
         os.makedirs(memory_dir)
@@ -91,19 +92,20 @@ def export_qdrant_snapshot(collection_name=None, snapshot_path=None):
         return None
 
 
-def import_qdrant_snapshot(snapshot_path, collection_name=None):
+def import_qdrant_snapshot(snapshot_path, user_id="default_user", collection_name=None):
     """
     Import Qdrant collection from a snapshot file
     
     Args:
         snapshot_path: Path to the snapshot file
-        collection_name: Name of the collection to import to, default is the collection name in config
+        user_id: User ID to specify which collection to import to
+        collection_name: Name of the collection to import to, default is based on user_id
         
     Returns:
         bool: Whether the import was successful
     """
     if collection_name is None:
-        collection_name = config["vector_store"]["config"]["collection_name"]
+        collection_name = get_collection_name(user_id)
     
     try:
         # Check if the snapshot file exists
