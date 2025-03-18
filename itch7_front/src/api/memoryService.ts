@@ -86,5 +86,35 @@ export const memoryService = {
             console.error("Memory import failed:", error);
             throw error;
         }
+    },
+
+    // Reset user's memory database
+    resetMemory: async (): Promise<void> => {
+        try {
+            const userId = await getUserId();
+            console.log(`Resetting memory database for user ${userId}...`);
+
+            const response = await fetch(`${API_BASE_URL}/reset-memory`, {
+                method: 'POST',
+                mode: 'cors',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ user_id: userId })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error("Reset failed:", errorText);
+                throw new Error(`Reset failed: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            console.log("Memory reset successful:", result);
+            return result;
+        } catch (error) {
+            console.error("Memory reset failed:", error);
+            throw error;
+        }
     }
 };

@@ -10,6 +10,38 @@ import { FrostedBackground, GlowEffect } from './components/FrostedBackground';
 import styled from 'styled-components';
 import { memoryService } from './api/memoryService';
 
+// 添加玩法说明组件
+const GameInstructions = styled(motion.div)`
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+  border: ${({ theme }) => theme.borders.glass};
+  border-radius: 15px;
+  padding: 15px 20px;
+  color: ${({ theme }) => theme.colors.text};
+  max-width: 300px;
+  box-shadow: ${({ theme }) => theme.shadows.soft};
+  z-index: 50;
+`;
+
+const InstructionsTitle = styled.h3`
+  font-size: 1.2rem;
+  margin-bottom: 12px;
+  color: ${({ theme }) => theme.colors.primary};
+  text-shadow: 0 0 3px rgba(255, 255, 255, 0.3);
+`;
+
+const InstructionsList = styled.ol`
+  padding-left: 20px;
+  
+  li {
+    margin-bottom: 8px;
+    line-height: 1.4;
+  }
+`;
+
 const AppContainer = styled.div`
   display: flex;
   flex-direction: column;
@@ -111,6 +143,21 @@ export default function App() {
       <FrostedBackground />
       <GlowEffect style={{ top: '20%', left: '30%' }} />
       <GlowEffect style={{ top: '60%', right: '25%' }} />
+
+      {/* 添加玩法说明 */}
+      <GameInstructions
+        initial={{ opacity: 0, x: -50 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.6 }}
+      >
+        <InstructionsTitle>玩法说明</InstructionsTitle>
+        <InstructionsList>
+          <li>在聊天框与AI聊天</li>
+          <li>时间到达七年自动结束游戏</li>
+          <li>随时保存你的记忆和导入你的记忆（结束后无法保存此次记忆）</li>
+          <li>游戏结束后需要手动刷新界面才能够进行下一局</li>
+        </InstructionsList>
+      </GameInstructions>
 
       <AppContainer>
         <HeaderText>ITCH-7 v0.0</HeaderText>

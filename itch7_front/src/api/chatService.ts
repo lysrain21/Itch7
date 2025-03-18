@@ -8,7 +8,10 @@ export const chatService = {
         message: string,
         onChunk: (chunk: string) => void,
         onDone: () => void,
-        onError: (error: Error) => void
+        onError: (error: Error) => void,
+        isAngry: boolean = false,
+        onControlMessage?: (control: string) => void,
+        isRepenting: boolean = false  // 添加忏悔状态参数
     ): Promise<void> => {
         try {
             const userId = await getUserId();
@@ -23,7 +26,8 @@ export const chatService = {
                 },
                 body: JSON.stringify({
                     message,
-                    user_id: userId
+                    user_id: userId,
+                    is_angry: isAngry,
                 })
             });
 
@@ -42,7 +46,6 @@ export const chatService = {
             // Create a text decoder
             const decoder = new TextDecoder();
 
-            // Handle SSE stream
             let buffer = '';
 
             while (true) {
@@ -65,6 +68,12 @@ export const chatService = {
                     if (line.startsWith('data: ')) {
                         try {
                             const data = JSON.parse(line.substring(6));
+
+                            // 处理控制消息
+                            if (data.control && onControlMessage) {
+                                onControlMessage(data.control);
+                                continue;
+                            }
 
                             if (data.content) {
                                 onChunk(data.content);

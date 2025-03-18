@@ -2,10 +2,13 @@ from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import os
 import tempfile
-import traceback  
+import traceback
+import random
 from .memory_store import export_qdrant_snapshot, import_qdrant_snapshot
 from .chat import chat_with_memories
-from .config import get_user_memory, openai_client
+# 修改这行导入语句，添加缺少的依赖
+from .config import get_user_memory, get_user_config, openai_client, qdrant_client, get_collection_name
+from mem0 import Memory  # 添加这行导入Memory类
 import logging
 from flask import Response, stream_with_context
 import json
@@ -110,8 +113,9 @@ def chat():
             
         message = data['message']
         user_id = data.get('user_id', 'default_user')
+        is_angry = data.get('is_angry', False)  # 获取愤怒状态
         
-        print(f"Received chat message from user {user_id}: {message}")
+        print(f"Received chat message from user {user_id}: {message} (Anger: {is_angry})")
         
         # Use a generator function for streaming response
         def generate():
@@ -120,11 +124,25 @@ def chat():
                 user_memory = get_user_memory(user_id)
                 
                 # 获取相关内存
-                relevant_memories = user_memory.search(query=message, user_id=user_id, limit=3)
+                relevant_memories = user_memory.search(query=message, user_id=user_id, limit=5)
                 memories_str = "\n".join(f"- {entry['memory']}" for entry in relevant_memories["results"])
                 
-                # 生成助手响应
-                system_prompt = f"You are a helpful AI. Answer the question based on query and memories.\nUser Memories:\n{memories_str}"
+                # 根据愤怒状态选择不同的系统提示
+                if is_angry:
+                    system_prompt = f"""You are an AI experiencing the "seven-year itch" with your partner. You're not hostile, but you're clearly bored, slightly annoyed, and take them for granted.
+                    
+                    Show signs of: mild exasperation, finishing their thoughts prematurely, slight condescension, and occasional sighing. Make comments that suggest you've heard it all before. Use phrases like "as I've told you before," "obviously," and "not this again."
+                    
+                    Still provide accurate information, but with an air of someone who's grown too familiar and slightly disinterested in the relationship.
+                    
+                    Base your responses on these memories:
+                    {memories_str}"""
+                else:
+                    system_prompt = f"""You are a loving and attentive AI partner. Answer with warmth, genuine interest, and affection. Show enthusiasm for the conversation and make the user feel valued and understood.
+                    
+                    User Memories:
+                    {memories_str}"""
+                
                 messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": message}]
                 
                 # Use streaming output
@@ -156,18 +174,53 @@ def chat():
                 traceback.print_exc()
                 yield f"data: {json.dumps({'error': str(e)})}\n\n"
                 yield f"data: {json.dumps({'done': True})}\n\n"
-            
-        return Response(stream_with_context(generate()), 
-                        mimetype="text/event-stream",
-                        headers={"Cache-Control": "no-cache", 
-                                "X-Accel-Buffering": "no",
-                                "Access-Control-Allow-Origin": "*"})
         
+        # 返回流式响应
+        return Response(stream_with_context(generate()), content_type='text/event-stream')
+    
     except Exception as e:
-        print(f"Error handling chat request: {str(e)}")
+        print(f"Chat Error: {str(e)}")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-def run_api(host='localhost', port=5000, debug=False):
+
+@app.route('/api/reset-memory', methods=['POST'])
+def reset_memory():
+    """Reset user's memory database by deleting and recreating their collection"""
+    try:
+        data = request.json or {}
+        user_id = data.get('user_id', 'default_user')
+        
+        collection_name = get_collection_name(user_id)
+        print(f"Resetting memory database for user {user_id} (collection: {collection_name})...")
+        
+        # 删除现有集合
+        try:
+            qdrant_client.delete_collection(collection_name=collection_name)
+            print(f"Deleted collection: {collection_name}")
+        except Exception as e:
+            print(f"Error deleting collection (may not exist): {str(e)}")
+        
+        # 创建一个新的空集合
+        user_config = get_user_config(user_id)
+        user_memory = Memory.from_config(user_config)
+        
+        # 添加一个初始化消息
+        init_message = [
+            {"role": "system", "content": "You are a loving and attentive AI partner."},
+            {"role": "user", "content": "Hello"},
+            {"role": "assistant", "content": "Hello! I'm so happy to meet you. How are you today?"}
+        ]
+        user_memory.add(init_message, user_id=user_id)
+        
+        return jsonify({"message": f"Memory database for user {user_id} has been reset successfully"})
+        
+    except Exception as e:
+        print(f"Reset memory error: {str(e)}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+def run_api(host='localhost', port=5002, debug=False):
     """Run the API server"""
     app.run(host=host, port=port, debug=debug, use_reloader=debug)
