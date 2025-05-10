@@ -5,7 +5,7 @@ from qdrant_client import QdrantClient
 import os
 
 # API configuration
-API_KEY = "sk-d7f14c1b081b46a394487a2655e4755d"
+API_KEY = 
 BASE_URL = "https://api.deepseek.com"
 
 # Set environment variables
